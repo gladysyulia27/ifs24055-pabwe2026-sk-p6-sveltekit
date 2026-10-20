@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "sveltekit",
+  "installCommand": "npm ci",
+  "buildCommand": "npx vite build",
+  "rewrites": [
+    {
+      "source": "/api/delcom/:path*",
+      "destination": "https://open-api.delcom.org/api/v1/:path*"
+    }
+  ]
+}
