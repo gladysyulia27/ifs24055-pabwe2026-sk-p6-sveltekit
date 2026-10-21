@@ -1,153 +1,38 @@
-# ifs24055-pabwe2026-sk-p6-sveltekit
+# ifs24053-pabwe2026-sk-p6-sveltekit
 
-Proyek Studi Kasus 2: Pengembangan Aplikasi Web **Delcom Courses** berbasis **SvelteKit** (TypeScript), **Tailwind CSS v4**, dan **Bun** (`@sveltejs/adapter-bun`). Terhubung langsung dengan Delcom Open API (`https://open-api.delcom.org/docs/1.0/api-courses`).
+Studi Kasus 2 (Praktikum 6): **Delcom Courses** — SvelteKit 3, TypeScript, Svelte 5,
+Tailwind CSS v4, `lucide-svelte`, SweetAlert2, system fonts, Delcom Open API
+(`https://open-api.delcom.org/api/v1`). Local builds use `adapter-bun`; Vercel builds
+automatically use `adapter-vercel`.
 
----
-
-## 🚀 Fitur Utama
-
-1. **Autentikasi & Sesi**:
-   - Pendaftaran akun baru (`/auth/register`).
-   - Masuk akun (`/auth/login`) dengan penyimpanan token aman di `localStorage`.
-   - Proteksi rute berbasis sesi dengan redirect otomatis (`AuthSessionRedirect`).
-   - Keluar akun (*logout*).
-
-2. **Manajemen Kursus (CRUD)**:
-   - Menampilkan daftar semua kursus dengan filter pencarian dan opsi "Semua / Kursus Saya" (`/`).
-   - Tambah kursus baru dengan judul dan deskripsi Markdown (`AddModal`).
-   - Ubah informasi kursus (`ChangeModal`).
-   - Ubah/unggah foto cover kursus (`ChangeCoverModal`).
-   - Hapus kursus dan hapus semua kursus milik pengguna (dengan dialog konfirmasi SweetAlert2).
-
-3. **Materi Pembelajaran (Course Contents)**:
-   - Tambah dan edit materi video YouTube (`ContentModal`).
-   - Tampilan video interaktif (*responsive YouTube iframe embed*) (`/courses/[courseId]/contents/[contentId]`).
-   - Penandaan status materi (Selesai / Belum Selesai).
-   - Hapus materi konten kursus.
-
-4. **Keanggotaan Mahasiswa & Progres**:
-   - Mengikuti kursus (*join/enroll*) sebagai mahasiswa.
-   - Keluar dari kursus (*leave/unenroll*).
-   - Indikator persentase progres belajar materi kursus.
-
-5. **Rating & Ulasan**:
-   - Pemberian nilai rating (1–5 bintang) beserta komentar ulasan.
-   - Perhitungan rata-rata rating kursus (*average rating*).
-
-6. **Pengguna & Profil**:
-   - Melihat daftar seluruh pengguna terdaftar (`/users`).
-   - Melihat dan memperbarui profil pengguna (`/profile`).
-   - Unggah/ganti foto profil.
-   - Ganti kata sandi (*password*).
-
----
-
-## 🛠️ Tech Stack & Konfigurasi
-
-- **Framework**: [SvelteKit](https://kit.svelte.dev/) (Svelte 5)
-- **Language**: TypeScript
-- **Runtime & Package Manager**: [Bun](https://bun.sh/)
-- **Adapter**: `@sveltejs/adapter-bun` (menggunakan prefix env `APP_`, default port: `3005`)
-- **Styling**: Tailwind CSS v4 (`@tailwindcss/vite`)
-- **Markdown**: Toast UI Editor (`@toast-ui/editor`)
-- **Icons**: Lucide Svelte (`lucide-svelte`)
-- **Testing**: Vitest, `@testing-library/svelte`, `@testing-library/jest-dom`, JSDOM, V8 Coverage
-
----
-
-## ⚙️ Variabel Lingkungan (`.env`)
-
-Konfigurasikan file `.env` berdasarkan `.env.example`:
-
-```env
-APP_PORT=3005
-VITE_DELCOM_BASEURL=https://open-api.delcom.org/api/v1
-```
-
----
-
-## 📦 Instalasi & Penggunaan
-
-### 1. Instalasi Dependensi
+## Menjalankan
 
 ```bash
 bun install
+bun run test:coverage   # line & function 100%; statement >= 99%, branch >= 85% (lihat vite.config.ts)
+bun run dev             # http://localhost:3005
+bun run build && bun start
 ```
 
-### 2. Mode Pengembangan (Development)
+Deploy to Vercel with the default SvelteKit build command (`bun run build`). Vercel
+sets `VERCEL` during the build, which selects the Vercel adapter instead of producing
+a Bun server build. The project pins Vercel's build and function runtime to Node 24.
 
-```bash
-bun run dev
-```
+`.env` (sudah disertakan) berisi `VITE_DELCOM_BASEURL` dan `APP_PORT=3005`.
+For Vercel, set `VITE_DELCOM_BASEURL=https://open-api.delcom.org/api/v1` in the
+project's environment variables; if it is unset, production builds use that URL by
+default. The local `.env` can continue pointing to `http://localhost:8000/api/v1`.
+Jangan memakai `bun test`; gunakan `bun run test` atau `bun x vitest run`.
 
-Aplikasi dapat diakses melalui browser di `http://localhost:3005`.
+## Proxy API
 
-### 3. Pengujian Unit & Cakupan Kode (Testing & Coverage)
+Browser memanggil `/api/*` di origin aplikasi sendiri; `src/routes/api/[...path]/+server.ts`
+meneruskannya ke `VITE_DELCOM_BASEURL` dari sisi server. Dengan begitu tidak ada permintaan
+lintas-origin (CORS) dari browser ke Delcom Open API. Gambar sampul/foto tetap dimuat
+langsung dari server Delcom lewat `getAssetUrl`.
 
-```bash
-# Menjalankan seluruh pengujian unit
-bun run test
+## Struktur
 
-# Menjalankan pengujian dengan laporan cakupan kode (V8)
-bun run test:coverage
-```
-
-- **Total Test Suites**: 28 file pengujian
-- **Total Tests**: 301 pengujian unit (100% lulus)
-- **Lines Coverage**: 100.00%
-- **Functions Coverage**: 100.00%
-
-### 4. Build & Jalankan untuk Produksi (Production)
-
-```bash
-# Kompilasi aplikasi untuk produksi
-bun run build
-
-# Menjalankan server produksi Bun
-bun start
-```
-
----
-
-## 📂 Struktur Direktori Proyek
-
-```
-src/
-├── app.d.ts
-├── app.html
-├── setupTests.ts
-├── test-utils.ts
-├── hooks/
-│   └── useInput.ts
-├── helpers/
-│   ├── apiHelper.ts
-│   └── toolsHelper.ts
-├── features/
-│   ├── auth/
-│   │   ├── api/
-│   │   ├── layouts/
-│   │   ├── pages/
-│   │   └── states/
-│   ├── common/
-│   │   └── pages/
-│   ├── courses/
-│   │   ├── api/
-│   │   ├── components/
-│   │   ├── layouts/
-│   │   ├── modals/
-│   │   ├── pages/
-│   │   └── states/
-│   └── users/
-│       ├── api/
-│       ├── pages/
-│       └── states/
-└── routes/
-    ├── +error.svelte
-    ├── +layout.svelte
-    ├── +layout.ts
-    ├── +page.svelte
-    ├── auth/
-    ├── courses/
-    ├── profile/
-    └── users/
-```
+- `src/routes` — halaman SvelteKit (`/`, `/courses/[courseId]`, `/courses/[courseId]/contents/[contentId]`, `/auth/*`, `/users`, `/profile`, `+error.svelte`)
+- `src/features/{auth,users,courses,common}` — api, states (Svelte store), layouts, pages, modals, components
+- `src/helpers`, `src/hooks` — `apiHelper`, `toolsHelper`, `storeHelper`, `useInput`

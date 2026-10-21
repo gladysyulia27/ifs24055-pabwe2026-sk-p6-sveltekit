@@ -1,157 +1,33 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { makeCourse, ok, renderWithProviders, submitForm, typeInto } from "../../../test-utils";
+import { putCourse } from "../api/courseApi";
 import ChangeModal from "./ChangeModal.svelte";
-import { renderWithProviders } from "../../../test-utils";
-import * as toolsHelper from "../../../helpers/toolsHelper";
-import { coursesStore } from "../states/coursesStore";
+
+vi.mock("../api/courseApi");
 
 describe("ChangeModal", () => {
-  const sampleCourse = {
-    id: 1,
-    user_id: 1,
-    title: "Old Title",
-    description: "Old Description",
-    created_at: "",
-    updated_at: "",
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.spyOn(coursesStore, "asyncSetIsCourseChange").mockImplementation(() => Promise.resolve());
-  });
-
-  it("should not render when show is false", () => {
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: false, course: sampleCourse },
-    });
-    expect(wrapper.find('[data-testid="change-course-modal"]').exists()).toBe(false);
-  });
-
-  it("should render and pre-fill data when show is true", () => {
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-    expect(wrapper.find('[data-testid="change-course-modal"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Ubah Data Kursus");
-
-    const input = wrapper.find('[data-testid="course-title-input"]');
-    expect((input.element as HTMLInputElement).value).toBe("Old Title");
-  });
-
-  it("should handle close button and cancel button clicks", async () => {
+  it("terisi data kursus dan menyimpan perubahan", async () => {
+    vi.mocked(putCourse).mockResolvedValue(ok());
+    const onSaved = vi.fn();
     const onClose = vi.fn();
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse, onClose },
+    const { container } = renderWithProviders(ChangeModal, {
+      props: { course: makeCourse(), onSaved, onClose },
     });
+    expect(screen.getByLabelText("Judul")).toHaveValue("Belajar Svelte");
+    expect(screen.getByLabelText("Deskripsi")).toHaveValue("Dasar-dasar Svelte");
 
-    const closeBtn = wrapper.find('[data-testid="close-modal-btn"]');
-    await closeBtn.trigger("click");
-    expect(onClose).toHaveBeenCalled();
-
-    const cancelBtn = wrapper.find('[data-testid="cancel-course-btn"]');
-    await cancelBtn.trigger("click");
-    expect(onClose).toHaveBeenCalledTimes(2);
+    await typeInto(screen.getByLabelText("Judul"), "Judul Baru");
+    await submitForm(container);
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(putCourse).toHaveBeenCalledWith(10, "Judul Baru", "Dasar-dasar Svelte");
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
-  it("should handle close without onClose callback", async () => {
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-
-    const closeBtn = wrapper.find('[data-testid="close-modal-btn"]');
-    await closeBtn.trigger("click");
-  });
-
-  it("should do nothing on save when course is null", async () => {
-    const { wrapper, coursesStore } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: null },
-    });
-
-    const titleInput = wrapper.find('[data-testid="course-title-input"]');
-    await titleInput.setValue("New Title");
-    const descInput = wrapper.find('[data-testid="course-description-textarea"]');
-    await descInput.setValue("New Description");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(coursesStore.isCourseChange).toBe(false);
-  });
-
-  it("should validate empty title", async () => {
-    const showError = vi.spyOn(toolsHelper, "showErrorDialog").mockImplementation(() => {});
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-
-    const titleInput = wrapper.find('[data-testid="course-title-input"]');
-    await titleInput.setValue("");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(showError).toHaveBeenCalledWith("Judul tidak boleh kosong");
-  });
-
-  it("should validate empty description", async () => {
-    const showError = vi.spyOn(toolsHelper, "showErrorDialog").mockImplementation(() => {});
-    const { wrapper } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-
-    const descInput = wrapper.find('[data-testid="course-description-textarea"]');
-    await descInput.setValue("");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(showError).toHaveBeenCalledWith("Deskripsi tidak boleh kosong");
-  });
-
-  it("should do nothing on submit if course id is missing", async () => {
-    const { wrapper, coursesStore } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: null },
-    });
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(coursesStore.isCourseChange).toBe(false);
-  });
-
-  it("should submit updated course data", async () => {
-    const { wrapper, coursesStore } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-
-    const titleInput = wrapper.find('[data-testid="course-title-input"]');
-    await titleInput.setValue("New Title");
-
-    const descInput = wrapper.find('[data-testid="course-description-textarea"]');
-    await descInput.setValue("New Description");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-
-    expect(coursesStore.asyncSetIsCourseChange).toBeDefined();
-  });
-
-  it("should react to isCourseChange and isCourseChanged completion", async () => {
+  it("tombol Batal menutup modal", () => {
     const onClose = vi.fn();
-    const { coursesStore } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse, onClose },
-    });
-
-    coursesStore.setIsCourseChanged(true);
-    coursesStore.setIsCourseChange(true);
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("should react to isCourseChange failure", async () => {
-    const { coursesStore } = renderWithProviders(ChangeModal, {
-      props: { show: true, course: sampleCourse },
-    });
-
-    coursesStore.setIsCourseChanged(false);
-    coursesStore.setIsCourseChange(true);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(coursesStore.isCourseChange).toBe(false);
+    renderWithProviders(ChangeModal, { props: { course: makeCourse(), onSaved: vi.fn(), onClose } });
+    screen.getByRole("button", { name: "Batal" }).click();
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });

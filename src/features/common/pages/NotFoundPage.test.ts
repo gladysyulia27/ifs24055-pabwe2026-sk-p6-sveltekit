@@ -1,39 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import NotFoundPage from "./NotFoundPage.svelte";
+import { screen } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import { renderWithProviders } from "../../../test-utils";
-import { mockGoto } from "../../../setupTests";
+import NotFoundPage from "./NotFoundPage.svelte";
 
 describe("NotFoundPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should render 404 text and description properly", () => {
-    const { wrapper } = renderWithProviders(NotFoundPage);
-
-    expect(wrapper.text()).toContain("404");
-    expect(wrapper.text()).toContain("Halaman Tidak Ditemukan");
-    expect(wrapper.text()).toContain(
-      "Maaf, halaman yang Anda cari tidak dapat ditemukan atau telah dipindahkan."
-    );
-  });
-
-  it("should navigate back when Kembali button is clicked", async () => {
-    const backSpy = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const { wrapper } = renderWithProviders(NotFoundPage);
-
-    const backButton = wrapper.find('[data-testid="back-button"]');
-    await backButton.trigger("click");
-
-    expect(backSpy).toHaveBeenCalled();
-  });
-
-  it("should navigate to home when Beranda button is clicked", async () => {
-    const { wrapper } = renderWithProviders(NotFoundPage);
-
-    const homeButton = wrapper.find('[data-testid="home-button"]');
-    await homeButton.trigger("click");
-
-    expect(mockGoto).toHaveBeenCalledWith("/");
+  it("menampilkan 404 dan tautan ke beranda", () => {
+    renderWithProviders(NotFoundPage);
+    expect(screen.getByText("404")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Kembali ke Beranda" })).toHaveAttribute("href", "/");
   });
 });

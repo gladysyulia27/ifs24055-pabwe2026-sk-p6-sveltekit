@@ -1,17 +1,16 @@
 <script lang="ts">
-  import type { Snippet } from "svelte";
   import "../index.css";
+  import type { Snippet } from "svelte";
   import { page } from "$app/state";
   import CourseLayout from "../features/courses/layouts/CourseLayout.svelte";
 
-  let { children }: { children?: Snippet } = $props();
-  let isAuthRoute = $derived(page.url.pathname.startsWith("/auth"));
+  let { children }: { children: Snippet } = $props();
 </script>
 
-{#if isAuthRoute}
-  {@render children?.()}
+{#if page.url.pathname.startsWith("/auth")}
+  {@render children()}
 {:else}
   <CourseLayout>
-    {@render children?.()}
+    {@render children()}
   </CourseLayout>
 {/if}

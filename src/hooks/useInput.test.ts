@@ -1,24 +1,14 @@
-import { describe, it, expect } from "vitest";
-import useInput from "./useInput";
+import { get } from "svelte/store";
+import { describe, expect, it } from "vitest";
+import { useInput } from "./useInput";
 
 describe("useInput", () => {
-  it("should initialize with default value and change value on change handler", () => {
-    const [value, handleValueChange, setValue] = useInput("initial");
-
-    expect(value.value).toBe("initial");
-
-    handleValueChange({ target: { value: "updated" } });
-    expect(value.value).toBe("updated");
-
-    setValue("direct");
-    expect(value.value).toBe("direct");
-  });
-
-  it("should initialize with empty string when no default given and handle direct value without event.target", () => {
-    const [value, handleValueChange] = useInput();
-    expect(value.value).toBe("");
-
-    handleValueChange("direct-val");
-    expect(value.value).toBe("direct-val");
+  it("menyimpan nilai dan bisa direset ke nilai awal", () => {
+    const input = useInput("awal");
+    expect(get(input.value)).toBe("awal");
+    input.value.set("baru");
+    expect(get(input.value)).toBe("baru");
+    input.reset();
+    expect(get(input.value)).toBe("awal");
   });
 });

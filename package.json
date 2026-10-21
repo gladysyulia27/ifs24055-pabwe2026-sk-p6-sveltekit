@@ -1,8 +1,11 @@
 {
-  "name": "ifs24002-pabwe2026-sk-p6-sveltekit",
+  "name": "ifs24053-pabwe2026-sk-p6-sveltekit",
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "start": "bun ./build",
     "dev": "vite dev",
@@ -24,7 +27,6 @@
   },
   "devDependencies": {
     "@sveltejs/adapter-bun": "^1.0.0",
-    "@sveltejs/adapter-netlify": "^7.0.1",
     "@sveltejs/adapter-vercel": "^7.0.1",
     "@sveltejs/kit": "^3.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

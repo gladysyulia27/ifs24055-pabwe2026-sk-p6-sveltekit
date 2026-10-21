@@ -1,146 +1,51 @@
 import { writable } from "svelte/store";
-import userApi, { type User } from "../api/userApi";
-import { showErrorDialog, showSuccessDialog } from "../../../helpers/toolsHelper";
+import { isSuccess } from "../../../helpers/apiHelper";
+import { withFlag } from "../../../helpers/storeHelper";
+import { authProfile, loadProfile } from "../../auth/states/authStore";
+import { getUsers, postPhoto, putMe, putPassword } from "../api/userApi";
 
-export interface UsersState {
-  users: User[];
-  user: User | null;
-  profile: User | null;
-  isProfile: boolean;
-  isChangeProfile: boolean;
-  isChangeProfilePhoto: boolean;
-  isChangeProfilePassword: boolean;
-}
+export const users = writable<User[]>([]);
+export const isUsersLoading = writable(false);
+export const isProfileSaving = writable(false);
+export const isPhotoSaving = writable(false);
+export const isPasswordSaving = writable(false);
 
-function createUsersStore() {
-  const initial: UsersState = {
-    users: [],
-    user: null,
-    profile: null,
-    isProfile: false,
-    isChangeProfile: false,
-    isChangeProfilePhoto: false,
-    isChangeProfilePassword: false,
-  };
-
-  let currentState: UsersState = { ...initial };
-  const innerStore = writable<UsersState>(currentState);
-  innerStore.subscribe((val) => {
-    currentState = val;
+export function loadUsers() {
+  return withFlag(isUsersLoading, async () => {
+    const response = await getUsers();
+    if (isSuccess(response)) {
+      users.set(response.data.users);
+    }
+    return response;
   });
-
-  return {
-    subscribe: innerStore.subscribe,
-    get users() {
-      return currentState.users;
-    },
-    get user() {
-      return currentState.user;
-    },
-    get profile() {
-      return currentState.profile;
-    },
-    get isProfile() {
-      return currentState.isProfile;
-    },
-    get isChangeProfile() {
-      return currentState.isChangeProfile;
-    },
-    get isChangeProfilePhoto() {
-      return currentState.isChangeProfilePhoto;
-    },
-    get isChangeProfilePassword() {
-      return currentState.isChangeProfilePassword;
-    },
-    get $state() {
-      return currentState;
-    },
-    reset(state: Partial<UsersState> = initial) {
-      innerStore.set({ ...initial, ...state });
-    },
-    setUsers(users: User[]) {
-      innerStore.update((s) => ({ ...s, users }));
-    },
-    setUser(user: User | null) {
-      innerStore.update((s) => ({ ...s, user }));
-    },
-    setProfile(profile: User | null) {
-      innerStore.update((s) => ({ ...s, profile }));
-    },
-    setIsProfile(status: boolean) {
-      innerStore.update((s) => ({ ...s, isProfile: status }));
-    },
-    setIsChangeProfile(status: boolean) {
-      innerStore.update((s) => ({ ...s, isChangeProfile: status }));
-    },
-    setIsChangeProfilePhoto(status: boolean) {
-      innerStore.update((s) => ({ ...s, isChangeProfilePhoto: status }));
-    },
-    setIsChangeProfilePassword(status: boolean) {
-      innerStore.update((s) => ({ ...s, isChangeProfilePassword: status }));
-    },
-    async asyncSetUsers() {
-      try {
-        const users = await userApi.getUsers();
-        this.setUsers(users);
-      } catch {
-        this.setUsers([]);
-      }
-    },
-    async asyncSetUserById(userId: string | number) {
-      try {
-        const user = await userApi.getUserById(userId);
-        this.setUser(user);
-      } catch {
-        this.setUser(null);
-      }
-    },
-    async asyncSetProfile() {
-      try {
-        const profile = await userApi.getProfile();
-        this.setProfile(profile);
-      } catch {
-        this.setProfile(null);
-      } finally {
-        this.setIsProfile(true);
-      }
-    },
-    async asyncPutProfile(name: string, email: string) {
-      try {
-        const profile = await userApi.putProfile(name, email);
-        this.setProfile(profile);
-        showSuccessDialog("Profil berhasil diperbarui!");
-        this.setIsChangeProfile(true);
-      } catch (error: any) {
-        showErrorDialog(error.message);
-        this.setIsChangeProfile(false);
-      }
-    },
-    async asyncPostProfilePhoto(photo: File) {
-      try {
-        const message = await userApi.postProfilePhoto(photo);
-        showSuccessDialog(message || "Foto profil berhasil diperbarui!");
-        const profile = await userApi.getProfile();
-        this.setProfile(profile);
-        this.setIsChangeProfilePhoto(true);
-      } catch (error: any) {
-        showErrorDialog(error.message);
-        this.setIsChangeProfilePhoto(false);
-      }
-    },
-    async asyncPutProfilePassword(oldPassword: string, newPassword: string, newPasswordConfirmation?: string) {
-      try {
-        const message = await userApi.putProfilePassword(oldPassword, newPassword, newPasswordConfirmation);
-        showSuccessDialog(message || "Kata sandi berhasil diperbarui!");
-        this.setIsChangeProfilePassword(true);
-      } catch (error: any) {
-        showErrorDialog(error.message);
-        this.setIsChangeProfilePassword(false);
-      }
-    },
-  };
 }
 
-export const usersStore = createUsersStore();
-export const useUsersStore = () => usersStore;
-export default usersStore;
+export function updateProfile(name: string, email: string) {
+  return withFlag(isProfileSaving, async () => {
+    const response = await putMe(name, email);
+    if (isSuccess(response)) {
+      authProfile.set(response.data.user);
+    }
+    return response;
+  });
+}
+
+export function updatePhoto(file: File) {
+  return withFlag(isPhotoSaving, async () => {
+    const response = await postPhoto(file);
+    if (isSuccess(response)) {
+      await loadProfile();
+    }
+    return response;
+  });
+}
+
+export function updatePassword(
+  password: string,
+  newPassword: string,
+  confirmation: string,
+) {
+  return withFlag(isPasswordSaving, () =>
+    putPassword(password, newPassword, confirmation),
+  );
+}

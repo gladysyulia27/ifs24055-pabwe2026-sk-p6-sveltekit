@@ -1,27 +1,10 @@
-export default function useInput(defaultValue: string = ""): [
-  { value: string },
-  (event: any) => void,
-  (v: string) => void
-] {
-  let val = defaultValue;
-  const value = {
-    get value() {
-      return val;
-    },
-    set value(v: string) {
-      val = v;
-    },
-  };
+import { writable } from "svelte/store";
 
-  function handleValueChange(event: any) {
-    value.value = event?.target?.value !== undefined ? event.target.value : event;
-  }
-
-  return [
+/** Hook input formulir: store nilai + fungsi reset ke nilai awal. */
+export function useInput(initial: string) {
+  const value = writable(initial);
+  return {
     value,
-    handleValueChange,
-    (v: string) => {
-      value.value = v;
-    },
-  ];
+    reset: () => value.set(initial),
+  };
 }

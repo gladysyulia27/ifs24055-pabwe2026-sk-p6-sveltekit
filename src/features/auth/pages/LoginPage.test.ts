@@ -1,160 +1,53 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/svelte";
+import Swal from "sweetalert2";
+import { describe, expect, it, vi } from "vitest";
+import { fail, makeUser, ok, renderWithProviders, submitForm, typeInto } from "../../../test-utils";
+import { getMe } from "../../users/api/userApi";
+import { postLogin } from "../api/authApi";
+import { authProfile } from "../states/authStore";
+import { get } from "svelte/store";
 import LoginPage from "./LoginPage.svelte";
-import { renderWithProviders } from "../../../test-utils";
-import apiHelper from "../../../helpers/apiHelper";
-import { mockGoto } from "../../../setupTests";
+
+vi.mock("../api/authApi");
+vi.mock("../../users/api/userApi");
+
+async function fillAndSubmit(container: HTMLElement) {
+  await typeInto(screen.getByLabelText("Email"), "budi@del.ac.id");
+  await typeInto(screen.getByLabelText("Kata Sandi"), "rahasia");
+  await submitForm(container);
+}
 
 describe("LoginPage", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it("should render inputs and handle submit", async () => {
-    const { wrapper, authStore } = renderWithProviders(LoginPage, {
-      preloadedState: {
-        isAuthLogin: false,
-        isProfile: false,
-      },
-    });
-
-    const loginSpy = vi
-      .spyOn(authStore, "asyncSetIsAuthLogin")
-      .mockReturnValue(Promise.resolve());
-
-    const emailInput = wrapper.find('[data-testid="login-email-input"]');
-    const passwordInput = wrapper.find('[data-testid="login-password-input"]');
-    const form = wrapper.find("form");
-
-    await emailInput.setValue("testing@delcom.org");
-    await passwordInput.setValue("123456");
-    await form.trigger("submit");
-
-    expect(loginSpy).toHaveBeenCalledWith("testing@delcom.org", "123456");
-  });
-
-  it("should handle submit when token is present", async () => {
-    vi.spyOn(apiHelper, "getAccessToken").mockReturnValue("valid-token");
-
-    const { wrapper, authStore } = renderWithProviders(LoginPage, {
-      preloadedState: {
-        isAuthLogin: false,
-        isProfile: false,
-      },
-    });
-
-    const loginSpy = vi
-      .spyOn(authStore, "asyncSetIsAuthLogin")
-      .mockReturnValue(Promise.resolve());
-
-    const emailInput = wrapper.find('[data-testid="login-email-input"]');
-    const passwordInput = wrapper.find('[data-testid="login-password-input"]');
-    const form = wrapper.find("form");
-
-    await emailInput.setValue("token@delcom.org");
-    await passwordInput.setValue("123456");
-    await form.trigger("submit");
-
-    expect(loginSpy).toHaveBeenCalledWith("token@delcom.org", "123456");
-  });
-
-  it("should handle error during form submit", async () => {
-    const { wrapper, authStore } = renderWithProviders(LoginPage, {
-      preloadedState: {
-        isAuthLogin: false,
-        isProfile: false,
-      },
-    });
-
-    vi.spyOn(authStore, "asyncSetIsAuthLogin").mockImplementation(
-      () => Promise.reject(new Error("Login failed"))
+  it("menampilkan formulir dengan selector audit dan tautan daftar", () => {
+    renderWithProviders(LoginPage);
+    expect(screen.getByRole("heading", { name: "Masuk", level: 1 })).toBeInTheDocument();
+    expect(screen.getByLabelText("Email")).toHaveAttribute("id", "login-email-input");
+    expect(screen.getByLabelText("Kata Sandi")).toHaveAttribute("id", "login-password-input");
+    expect(screen.getByRole("button", { name: "Masuk" })).toHaveAttribute(
+      "id",
+      "login-submit-button",
     );
-
-    const emailInput = wrapper.find('[data-testid="login-email-input"]');
-    const passwordInput = wrapper.find('[data-testid="login-password-input"]');
-    const form = wrapper.find("form");
-
-    await emailInput.setValue("error@delcom.org");
-    await passwordInput.setValue("123456");
-    await form.trigger("submit");
-
-    expect(wrapper.find('[data-testid="login-submit-button"]').exists()).toBe(true);
+    expect(screen.getByRole("link", { name: "Daftar" })).toHaveAttribute("href", "/auth/register");
   });
 
-  it("should trigger asyncSetProfile when login succeeds and token exists", async () => {
-    vi.spyOn(apiHelper, "getAccessToken").mockReturnValue("test-token");
-
-    const { authStore, usersStore } = renderWithProviders(LoginPage, {
-      preloadedState: {
-        isAuthLogin: false,
-        isProfile: false,
-      },
-    });
-
-    const setProfileSpy = vi
-      .spyOn(usersStore, "asyncSetProfile")
-      .mockReturnValue(Promise.resolve());
-
-    authStore.setIsAuthLogin(true);
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(setProfileSpy).toHaveBeenCalled();
+  it("login berhasil memuat profil tanpa dialog error", async () => {
+    vi.mocked(postLogin).mockResolvedValue(ok({ token: "tok", user: makeUser() }));
+    vi.mocked(getMe).mockResolvedValue(ok({ user: makeUser() }));
+    const { container } = renderWithProviders(LoginPage);
+    await fillAndSubmit(container);
+    await waitFor(() => expect(get(authProfile)).not.toBeNull());
+    expect(postLogin).toHaveBeenCalledWith("budi@del.ac.id", "rahasia");
+    expect(Swal.fire).not.toHaveBeenCalled();
   });
 
-  it("should reset state when login fails or when isProfile finishes", async () => {
-    vi.spyOn(apiHelper, "getAccessToken").mockReturnValue(null);
-
-    const { authStore, usersStore } = renderWithProviders(LoginPage, {
-      preloadedState: {
-        isAuthLogin: false,
-        isProfile: false,
-      },
-    });
-
-    const setLoginActionSpy = vi.spyOn(authStore, "setIsAuthLogin");
-    const setIsProfileSpy = vi.spyOn(usersStore, "setIsProfile");
-
-    // Case 1: isAuthLogin true but no token
-    authStore.setIsAuthLogin(true);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(setLoginActionSpy).toHaveBeenCalledWith(false);
-
-    // Case 2: isProfile true
-    usersStore.setIsProfile(true);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(setIsProfileSpy).toHaveBeenCalledWith(false);
-
-    usersStore.setProfile({ id: 1, name: "Ada", email: "ada@del.org" });
-    usersStore.setIsProfile(true);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(mockGoto).toHaveBeenCalledWith("/");
-  });
-
-  it("should redirect after a complete login", async () => {
-    vi.spyOn(apiHelper, "getAccessToken").mockReturnValue("token");
-    const { wrapper, authStore, usersStore } = renderWithProviders(LoginPage);
-    vi.spyOn(authStore, "asyncSetIsAuthLogin").mockImplementation(async () => {
-      authStore.setIsAuthLogin(true);
-    });
-    vi.spyOn(usersStore, "asyncSetProfile").mockImplementation(async () => {
-      usersStore.setProfile({ id: 1, name: "Ada", email: "ada@del.org" });
-    });
-    await wrapper.find('[data-testid="login-email-input"]').setValue("ada@del.org");
-    await wrapper.find('[data-testid="login-password-input"]').setValue("secret12");
-    await wrapper.find("form").trigger("submit");
-    await new Promise((r) => setTimeout(r, 0));
-    expect(mockGoto).toHaveBeenCalledWith("/");
-
-    vi.spyOn(apiHelper, "getAccessToken").mockReturnValue("token");
-    const empty = renderWithProviders(LoginPage);
-    vi.spyOn(empty.authStore, "asyncSetIsAuthLogin").mockImplementation(async () => {
-      empty.authStore.setIsAuthLogin(true);
-    });
-    vi.spyOn(empty.usersStore, "asyncSetProfile").mockImplementation(async () => {
-      empty.usersStore.setProfile(null);
-    });
-    await empty.wrapper.find('[data-testid="login-email-input"]').setValue("ada@del.org");
-    await empty.wrapper.find('[data-testid="login-password-input"]').setValue("secret12");
-    await empty.wrapper.find("form").trigger("submit");
-    await new Promise((r) => setTimeout(r, 0));
+  it("login gagal menampilkan dialog error", async () => {
+    vi.mocked(postLogin).mockResolvedValue(fail("Email atau kata sandi salah"));
+    const { container } = renderWithProviders(LoginPage);
+    await fillAndSubmit(container);
+    await waitFor(() =>
+      expect(Swal.fire).toHaveBeenCalledWith(
+        expect.objectContaining({ icon: "error", text: "Email atau kata sandi salah" }),
+      ),
+    );
   });
 });

@@ -1,124 +1,47 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/svelte";
+import Swal from "sweetalert2";
+import { describe, expect, it, vi } from "vitest";
+import { fail, ok, renderWithProviders, submitForm, typeInto } from "../../../test-utils";
+import { postCourse } from "../api/courseApi";
 import AddModal from "./AddModal.svelte";
-import { renderWithProviders } from "../../../test-utils";
-import * as toolsHelper from "../../../helpers/toolsHelper";
-import { coursesStore } from "../states/coursesStore";
+
+vi.mock("../api/courseApi");
+
+async function fill(container: HTMLElement) {
+  await typeInto(screen.getByLabelText("Judul"), "Kursus Baru");
+  await typeInto(screen.getByLabelText("Deskripsi"), "Isi kursus");
+  await submitForm(container);
+}
 
 describe("AddModal", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.spyOn(coursesStore, "asyncSetIsCourseAdd").mockImplementation(() => Promise.resolve());
-  });
-
-  it("should not render when show is false", () => {
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: false },
-    });
-    expect(wrapper.find('[data-testid="add-course-modal"]').exists()).toBe(false);
-  });
-
-  it("should render correctly when show is true", () => {
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-    expect(wrapper.find('[data-testid="add-course-modal"]').exists()).toBe(true);
-    expect(wrapper.text()).toContain("Tambah Kursus Baru");
-  });
-
-  it("should handle close button click", async () => {
+  it("menyimpan kursus lalu memanggil onSaved dan onClose", async () => {
+    vi.mocked(postCourse).mockResolvedValue(ok());
+    const onSaved = vi.fn();
     const onClose = vi.fn();
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true, onClose },
-    });
-
-    const closeBtn = wrapper.find('[data-testid="close-modal-btn"]');
-    await closeBtn.trigger("click");
-    expect(onClose).toHaveBeenCalled();
+    const { container } = renderWithProviders(AddModal, { props: { onSaved, onClose } });
+    await fill(container);
+    await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+    expect(postCourse).toHaveBeenCalledWith("Kursus Baru", "Isi kursus");
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
-  it("should handle cancel button click", async () => {
+  it("gagal: dialog error dan modal tetap terbuka", async () => {
+    vi.mocked(postCourse).mockResolvedValue(fail("Judul wajib diisi"));
+    const onSaved = vi.fn();
     const onClose = vi.fn();
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true, onClose },
-    });
-
-    const cancelBtn = wrapper.find('[data-testid="cancel-course-btn"]');
-    await cancelBtn.trigger("click");
-    expect(onClose).toHaveBeenCalled();
+    const { container } = renderWithProviders(AddModal, { props: { onSaved, onClose } });
+    await fill(container);
+    await waitFor(() =>
+      expect(Swal.fire).toHaveBeenCalledWith(expect.objectContaining({ icon: "error" })),
+    );
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("should handle close without onClose callback", async () => {
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-
-    const closeBtn = wrapper.find('[data-testid="close-modal-btn"]');
-    await closeBtn.trigger("click");
-  });
-
-  it("should validate empty title", async () => {
-    const showError = vi.spyOn(toolsHelper, "showErrorDialog").mockImplementation(() => {});
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(showError).toHaveBeenCalledWith("Judul tidak boleh kosong");
-  });
-
-  it("should validate empty description", async () => {
-    const showError = vi.spyOn(toolsHelper, "showErrorDialog").mockImplementation(() => {});
-    const { wrapper } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-
-    const titleInput = wrapper.find('[data-testid="course-title-input"]');
-    await titleInput.setValue("Judul Kursus");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-    expect(showError).toHaveBeenCalledWith("Deskripsi tidak boleh kosong");
-  });
-
-  it("should submit valid course data", async () => {
-    const { wrapper, coursesStore } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-
-    const titleInput = wrapper.find('[data-testid="course-title-input"]');
-    await titleInput.setValue("Belajar SvelteKit");
-
-    const descInput = wrapper.find('[data-testid="course-description-textarea"]');
-    await descInput.setValue("Deskripsi materi kursus SvelteKit lengkap");
-
-    const form = wrapper.find("form");
-    await form.trigger("submit");
-
-    expect(coursesStore.asyncSetIsCourseAdd).toBeDefined();
-  });
-
-  it("should react to isCourseAdd and isCourseAdded completion", async () => {
+  it("tombol Batal menutup modal", () => {
     const onClose = vi.fn();
-    const { coursesStore } = renderWithProviders(AddModal, {
-      props: { show: true, onClose },
-    });
-
-    coursesStore.setIsCourseAdded(true);
-    coursesStore.setIsCourseAdd(true);
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("should react to isCourseAdd failure", async () => {
-    const { coursesStore } = renderWithProviders(AddModal, {
-      props: { show: true },
-    });
-
-    coursesStore.setIsCourseAdded(false);
-    coursesStore.setIsCourseAdd(true);
-    await new Promise((r) => setTimeout(r, 10));
-    expect(coursesStore.isCourseAdd).toBe(false);
+    renderWithProviders(AddModal, { props: { onSaved: vi.fn(), onClose } });
+    screen.getByRole("button", { name: "Batal" }).click();
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
